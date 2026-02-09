@@ -49,12 +49,6 @@ npm install
 npm run dev
 ```
 
-## Full Linux setup and launch guide
-
-For full command-by-command Linux setup (system deps, MySQL setup, backend/frontend install, launch, Docker, and SQLite fallback), see:
-
-- **[docs/SETUP_LINUX.md](docs/SETUP_LINUX.md)**
-
 ## Main API routes
 
 - `POST /api/auth/register`
