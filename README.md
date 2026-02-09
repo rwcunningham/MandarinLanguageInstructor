@@ -1,29 +1,61 @@
 # Mandarin Language Instructor
 
-A full-stack Chinese learning app using **Flask + MySQL + React**.
+A full-stack learning app using **Flask + MySQL + React** where users can:
 
-## What it does
+- Register/login with password hashing (Werkzeug)
+- Choose reading level and short Mandarin stories
+- Read hanzi with pinyin (tone marks)
+- Click or drag-select text to fetch definitions/translations
+- See lookup results in speech-bubble overlays
+- Save lookups to flashcards
+- Listen to selected text or whole story with browser TTS
 
-- User signup/login with hashed passwords
-- Mandarin short stories by level
-- Hanzi + pinyin reading view
-- Character/word/phrase/clause/sentence lookup
-- Flashcard saving
-- Browser text-to-speech
+## Architecture
 
-## Start here
+- **Backend**: Flask + SQLAlchemy + MySQL (`backend/app.py`)
+- **Frontend**: React + Vite (`frontend/src/App.jsx`)
+- **Database**: MySQL 8 (Docker Compose)
+- **Lookup source**:
+  - Local seed dictionary for common words/characters
+  - Fallback to free MyMemory translation API for phrase/clause/sentence lookups
 
-- Linux setup + all commands: **[docs/SETUP_LINUX.md](docs/SETUP_LINUX.md)**
-- Docker quick start:
+## Quick start (Docker)
 
 ```bash
 docker compose up --build
 ```
 
-- Frontend: <http://localhost:5173>
-- Backend: <http://localhost:5000>
+Frontend: <http://localhost:5173>
+Backend API: <http://localhost:5000>
 
-## API routes
+## Local dev
+
+### Backend
+
+```bash
+cd backend
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+export USE_SQLITE=1
+python app.py
+```
+
+### Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+## Full Linux setup and launch guide
+
+For full command-by-command Linux setup (system deps, MySQL setup, backend/frontend install, launch, Docker, and SQLite fallback), see:
+
+- **[docs/SETUP_LINUX.md](docs/SETUP_LINUX.md)**
+
+## Main API routes
 
 - `POST /api/auth/register`
 - `POST /api/auth/login`
