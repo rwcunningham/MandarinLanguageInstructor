@@ -26,7 +26,7 @@ docker compose up --build
 ```
 
 Frontend: <http://localhost:5173>
-Backend API: <http://localhost:5000>
+Backend API: <http://localhost:5001>
 
 ## Local dev
 
