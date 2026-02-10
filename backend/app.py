@@ -9,13 +9,14 @@ import requests
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.security import check_password_hash, generate_password_hash
 
 app = Flask(__name__)
 CORS(app)
 
-mysql_uri = os.getenv("MYSQL_URI", "mysql+pymysql://root:password@localhost:3306/mandarin_reader")
-if os.getenv("USE_SQLITE", "0") == "1":
+mysql_uri = os.getenv("MYSQL_URI")
+if os.getenv("USE_SQLITE", "0") == "1" or not mysql_uri:
     mysql_uri = "sqlite:///mandarin_reader.db"
 
 app.config["SQLALCHEMY_DATABASE_URI"] = mysql_uri
@@ -118,12 +119,18 @@ def register():
     password = payload.get("password", "")
     if not username or len(password) < 6:
         return jsonify({"error": "Username and password (>=6 chars) required"}), 400
-    if User.query.filter_by(username=username).first():
-        return jsonify({"error": "Username already exists"}), 409
 
-    user = User(username=username, password_hash=generate_password_hash(password))
-    db.session.add(user)
-    db.session.commit()
+    try:
+        if User.query.filter_by(username=username).first():
+            return jsonify({"error": "Username already exists"}), 409
+
+        user = User(username=username, password_hash=generate_password_hash(password))
+        db.session.add(user)
+        db.session.commit()
+    except SQLAlchemyError:
+        db.session.rollback()
+        return jsonify({"error": "Database unavailable. Check backend DB configuration."}), 503
+
     token = create_token(user.id)
     return jsonify({"token": token, "username": username})
 
@@ -133,7 +140,12 @@ def login():
     payload = request.get_json(silent=True) or {}
     username = payload.get("username", "").strip()
     password = payload.get("password", "")
-    user = User.query.filter_by(username=username).first()
+
+    try:
+        user = User.query.filter_by(username=username).first()
+    except SQLAlchemyError:
+        return jsonify({"error": "Database unavailable. Check backend DB configuration."}), 503
+
     if not user or not check_password_hash(user.password_hash, password):
         return jsonify({"error": "Invalid credentials"}), 401
     token = create_token(user.id)
