@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:5001'
+
 const api = async (path, method = 'GET', token, body) => {
-  const response = await fetch(path, {
+  const response = await fetch(`${API_BASE}${path}`, {
     method,
     headers: {
       'Content-Type': 'application/json',
@@ -10,9 +12,18 @@ const api = async (path, method = 'GET', token, body) => {
     ...(body ? { body: JSON.stringify(body) } : {})
   })
 
-  const data = await response.json()
+  const raw = await response.text()
+  let data = {}
+  if (raw) {
+    try {
+      data = JSON.parse(raw)
+    } catch {
+      throw new Error(`Server returned non-JSON response (${response.status})`)
+    }
+  }
+
   if (!response.ok) {
-    throw new Error(data.error || 'Request failed')
+    throw new Error(data.error || `Request failed (${response.status})`)
   }
   return data
 }
