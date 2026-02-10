@@ -46,6 +46,7 @@ export default function App() {
   const [selectedStoryId, setSelectedStoryId] = useState(null)
   const [story, setStory] = useState(null)
   const [bubble, setBubble] = useState(null)
+  const [selectedRange, setSelectedRange] = useState(null)
   const [flashcards, setFlashcards] = useState([])
   const [error, setError] = useState('')
 
@@ -53,6 +54,40 @@ export default function App() {
     () => (story ? story.segments.map((s) => s.hanzi).join('') : ''),
     [story]
   )
+
+  const segmentRanges = useMemo(() => {
+    if (!story) return []
+    let cursor = 0
+    return story.segments.map((segment) => {
+      const start = cursor
+      cursor += segment.hanzi.length
+      return { start, end: cursor }
+    })
+  }, [story])
+
+  const isSegmentHighlighted = (index) => {
+    if (!selectedRange) return false
+    const range = segmentRanges[index]
+    if (!range) return false
+    return range.start < selectedRange.end && range.end > selectedRange.start
+  }
+
+  const selectText = async (selectedText, rect, range) => {
+    if (!selectedText) return
+    const granularity = classifySelection(selectedText)
+
+    try {
+      const data = await api('/api/lookup', 'POST', token, { text: selectedText, granularity })
+      setBubble({
+        ...data,
+        x: window.scrollX + (rect?.left || 100),
+        y: window.scrollY + (rect?.top || 200) - 14
+      })
+      setSelectedRange(range)
+    } catch (err) {
+      setError(err.message)
+    }
+  }
 
   useEffect(() => {
     if (!token) return
@@ -86,6 +121,8 @@ export default function App() {
       try {
         const data = await api(`/api/stories/${selectedStoryId}`, 'GET', token)
         setStory(data)
+        setBubble(null)
+        setSelectedRange(null)
       } catch (err) {
         setError(err.message)
       }
@@ -108,24 +145,24 @@ export default function App() {
 
   const handleMouseUp = async () => {
     if (!story) return
-    const selectedText = window.getSelection().toString().trim()
+    const selection = window.getSelection()
+    const selectedText = selection.toString().trim()
     if (!selectedText) return
 
-    const granularity = classifySelection(selectedText)
-    const selection = window.getSelection()
     const range = selection.rangeCount > 0 ? selection.getRangeAt(0) : null
     const rect = range?.getBoundingClientRect()
+    const start = storyPlainText.indexOf(selectedText)
+    const resolvedRange = start >= 0
+      ? { start, end: start + selectedText.length }
+      : null
 
-    try {
-      const data = await api('/api/lookup', 'POST', token, { text: selectedText, granularity })
-      setBubble({
-        ...data,
-        x: window.scrollX + (rect?.left || 100),
-        y: window.scrollY + (rect?.top || 200) - 14
-      })
-    } catch (err) {
-      setError(err.message)
-    }
+    await selectText(selectedText, rect, resolvedRange)
+  }
+
+  const handleSegmentClick = async (segment, index, event) => {
+    const rect = event.currentTarget.getBoundingClientRect()
+    const range = segmentRanges[index]
+    await selectText(segment.hanzi, rect, range)
   }
 
   const addFlashcard = async () => {
@@ -160,6 +197,8 @@ export default function App() {
     setStories([])
     setLevels([])
     setFlashcards([])
+    setBubble(null)
+    setSelectedRange(null)
   }
 
   if (!token) {
@@ -227,9 +266,9 @@ export default function App() {
           </div>
           <article className="story-grid">
             {story.segments.map((segment, index) => (
-              <span key={`${segment.hanzi}-${index}`} className="segment">
+              <span key={`${segment.hanzi}-${index}`} className={`segment ${isSegmentHighlighted(index) ? 'active' : ''}`}>
                 <span className="pinyin">{segment.pinyin || ' '}</span>
-                <span className="hanzi" onClick={() => speakText(segment.hanzi)}>{segment.hanzi}</span>
+                <span className="hanzi" onClick={(event) => handleSegmentClick(segment, index, event)}>{segment.hanzi}</span>
               </span>
             ))}
           </article>
