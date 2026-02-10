@@ -1,17 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 
-const API_BASE = import.meta.env.VITE_API_BASE || '/api'
-
-const buildUrl = (base, path) => {
-  if (!base || base === '/api') return path
-  if (base.endsWith('/api') && path.startsWith('/api/')) {
-    return `${base}${path.slice(4)}`
-  }
-  return `${base}${path}`
-}
-
-const requestJson = async (url, method, token, body) => {
-  const response = await fetch(url, {
+const api = async (path, method = 'GET', token, body) => {
+  const response = await fetch(path, {
     method,
     headers: {
       'Content-Type': 'application/json',
@@ -20,40 +10,11 @@ const requestJson = async (url, method, token, body) => {
     ...(body ? { body: JSON.stringify(body) } : {})
   })
 
-  const raw = await response.text()
-  let data = {}
-  if (raw) {
-    try {
-      data = JSON.parse(raw)
-    } catch {
-      throw new Error(`Server returned non-JSON response (${response.status})`)
-    }
-  }
-
+  const data = await response.json()
   if (!response.ok) {
-    throw new Error(data.error || `Request failed (${response.status})`)
+    throw new Error(data.error || 'Request failed')
   }
   return data
-}
-
-const api = async (path, method = 'GET', token, body) => {
-  const primaryUrl = buildUrl(API_BASE, path)
-
-  try {
-    return await requestJson(primaryUrl, method, token, body)
-  } catch (primaryErr) {
-    const fallbackBase = 'http://localhost:5001'
-    const fallbackUrl = buildUrl(fallbackBase, path)
-    if (fallbackUrl === primaryUrl) {
-      throw primaryErr
-    }
-
-    try {
-      return await requestJson(fallbackUrl, method, token, body)
-    } catch {
-      throw primaryErr
-    }
-  }
 }
 
 const classifySelection = (text) => {
