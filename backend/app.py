@@ -113,7 +113,7 @@ def fetch_translation(text: str) -> Optional[str]:
 
 @app.post("/api/auth/register")
 def register():
-    payload = request.get_json(force=True)
+    payload = request.get_json(silent=True) or {}
     username = payload.get("username", "").strip()
     password = payload.get("password", "")
     if not username or len(password) < 6:
@@ -130,7 +130,7 @@ def register():
 
 @app.post("/api/auth/login")
 def login():
-    payload = request.get_json(force=True)
+    payload = request.get_json(silent=True) or {}
     username = payload.get("username", "").strip()
     password = payload.get("password", "")
     user = User.query.filter_by(username=username).first()
@@ -173,7 +173,7 @@ def story(story_id: int):
 @app.post("/api/lookup")
 @auth_required
 def lookup():
-    payload = request.get_json(force=True)
+    payload = request.get_json(silent=True) or {}
     text = payload.get("text", "").strip()
     if not text:
         return jsonify({"error": "Text required"}), 400
@@ -212,7 +212,7 @@ def list_flashcards():
 @app.post("/api/flashcards")
 @auth_required
 def add_flashcard():
-    payload = request.get_json(force=True)
+    payload = request.get_json(silent=True) or {}
     required = ["source_text", "translation", "granularity"]
     if any(not payload.get(r) for r in required):
         return jsonify({"error": "source_text, translation, granularity are required"}), 400
