@@ -48,12 +48,28 @@ export default function App() {
   const [bubble, setBubble] = useState(null)
   const [selectedRange, setSelectedRange] = useState(null)
   const [flashcards, setFlashcards] = useState([])
+  const [view, setView] = useState('reader')
+  const [practiceFilter, setPracticeFilter] = useState('all')
+  const [practiceIndex, setPracticeIndex] = useState(0)
+  const [showAnswer, setShowAnswer] = useState(false)
+  const [learnedByCardId, setLearnedByCardId] = useState({})
   const [error, setError] = useState('')
 
   const storyPlainText = useMemo(
     () => (story ? story.segments.map((s) => s.hanzi).join('') : ''),
     [story]
   )
+
+  const learnedStorageKey = useMemo(() => `learnedFlashcards:${username || 'anon'}`, [username])
+
+  useEffect(() => {
+    const saved = localStorage.getItem(learnedStorageKey)
+    setLearnedByCardId(saved ? JSON.parse(saved) : {})
+  }, [learnedStorageKey])
+
+  useEffect(() => {
+    localStorage.setItem(learnedStorageKey, JSON.stringify(learnedByCardId))
+  }, [learnedByCardId, learnedStorageKey])
 
   const segmentRanges = useMemo(() => {
     if (!story) return []
@@ -64,6 +80,22 @@ export default function App() {
       return { start, end: cursor }
     })
   }, [story])
+
+  const practiceDeck = useMemo(() => {
+    if (practiceFilter === 'unknown') {
+      return flashcards.filter((card) => !learnedByCardId[card.id])
+    }
+    return flashcards
+  }, [flashcards, practiceFilter, learnedByCardId])
+
+  const activePracticeCard = practiceDeck[practiceIndex] || null
+
+  useEffect(() => {
+    if (practiceIndex > 0 && practiceIndex >= practiceDeck.length) {
+      setPracticeIndex(Math.max(practiceDeck.length - 1, 0))
+    }
+    setShowAnswer(false)
+  }, [practiceDeck.length, practiceIndex])
 
   const isSegmentHighlighted = (index) => {
     if (!selectedRange) return false
@@ -78,10 +110,15 @@ export default function App() {
 
     try {
       const data = await api('/api/lookup', 'POST', token, { text: selectedText, granularity })
+      const anchorX = window.scrollX + ((rect?.left || 100) + ((rect?.width || 0) / 2))
+      const minX = window.scrollX + 40
+      const maxX = window.scrollX + window.innerWidth - 40
+      const clampedX = Math.min(maxX, Math.max(minX, anchorX))
+
       setBubble({
         ...data,
-        x: window.scrollX + (rect?.left || 100),
-        y: window.scrollY + (rect?.top || 200) - 14
+        x: clampedX,
+        y: window.scrollY + (rect?.bottom || 220) + 14
       })
       setSelectedRange(range)
     } catch (err) {
@@ -188,6 +225,22 @@ export default function App() {
     window.speechSynthesis.speak(utterance)
   }
 
+  const markCardLearned = (cardId, learned) => {
+    setLearnedByCardId((prev) => ({ ...prev, [cardId]: learned }))
+  }
+
+  const nextPracticeCard = () => {
+    if (practiceDeck.length <= 1) return
+    setPracticeIndex((i) => (i + 1) % practiceDeck.length)
+    setShowAnswer(false)
+  }
+
+  const previousPracticeCard = () => {
+    if (practiceDeck.length <= 1) return
+    setPracticeIndex((i) => (i - 1 + practiceDeck.length) % practiceDeck.length)
+    setShowAnswer(false)
+  }
+
   const logout = () => {
     setToken('')
     localStorage.removeItem('token')
@@ -199,6 +252,7 @@ export default function App() {
     setFlashcards([])
     setBubble(null)
     setSelectedRange(null)
+    setView('reader')
   }
 
   if (!token) {
@@ -236,71 +290,121 @@ export default function App() {
         <button onClick={logout}>Logout</button>
       </header>
 
-      <section className="control-row">
-        <label>
-          Reading level
-          <select value={selectedLevel} onChange={(e) => setSelectedLevel(e.target.value)}>
-            <option value="">Select level</option>
-            {levels.map((level) => (
-              <option key={level} value={level}>{level}</option>
-            ))}
-          </select>
-        </label>
+      <nav className="top-nav">
+        <button className={view === 'reader' ? 'active' : ''} onClick={() => setView('reader')}>Story Reader</button>
+        <button className={view === 'practice' ? 'active' : ''} onClick={() => setView('practice')}>Flashcard Practice Mode</button>
+      </nav>
 
-        <label>
-          Story
-          <select value={selectedStoryId || ''} onChange={(e) => setSelectedStoryId(Number(e.target.value))}>
-            <option value="">Select story</option>
-            {stories.map((s) => (
-              <option key={s.id} value={s.id}>{s.title}</option>
-            ))}
-          </select>
-        </label>
-      </section>
+      {view === 'reader' && (
+        <>
+          <section className="control-row">
+            <label>
+              Reading level
+              <select value={selectedLevel} onChange={(e) => setSelectedLevel(e.target.value)}>
+                <option value="">Select level</option>
+                {levels.map((level) => (
+                  <option key={level} value={level}>{level}</option>
+                ))}
+              </select>
+            </label>
 
-      {story && (
-        <section className="reader" onMouseUp={handleMouseUp}>
-          <div className="reader-header">
-            <h2>{story.title}</h2>
-            <button onClick={() => speakText(storyPlainText)}>🔊 Listen to full story</button>
+            <label>
+              Story
+              <select value={selectedStoryId || ''} onChange={(e) => setSelectedStoryId(Number(e.target.value))}>
+                <option value="">Select story</option>
+                {stories.map((s) => (
+                  <option key={s.id} value={s.id}>{s.title}</option>
+                ))}
+              </select>
+            </label>
+          </section>
+
+          {story && (
+            <section className="reader" onMouseUp={handleMouseUp}>
+              <div className="reader-header">
+                <h2>{story.title}</h2>
+                <button onClick={() => speakText(storyPlainText)}>🔊 Listen to full story</button>
+              </div>
+              <article className="story-grid">
+                {story.segments.map((segment, index) => (
+                  <span key={`${segment.hanzi}-${index}`} className={`segment ${isSegmentHighlighted(index) ? 'active' : ''}`}>
+                    <span className="pinyin">{segment.pinyin || ' '}</span>
+                    <span className="hanzi" onClick={(event) => handleSegmentClick(segment, index, event)}>{segment.hanzi}</span>
+                  </span>
+                ))}
+              </article>
+            </section>
+          )}
+
+          {bubble && (
+            <aside className="bubble" style={{ left: bubble.x, top: bubble.y }}>
+              <strong>{bubble.text}</strong>
+              <small>{bubble.pinyin}</small>
+              <p>{bubble.translation}</p>
+              <span className="badge">{bubble.granularity}</span>
+              <div className="bubble-actions">
+                <button onClick={() => speakText(bubble.text)}>Read aloud</button>
+                <button onClick={addFlashcard}>Save flashcard</button>
+              </div>
+            </aside>
+          )}
+
+          <section className="flashcards">
+            <h3>Saved flashcards</h3>
+            <div className="card-grid">
+              {flashcards.map((card) => (
+                <article key={card.id} className="card">
+                  <h4>{card.source_text}</h4>
+                  <small>{card.pinyin}</small>
+                  <p>{card.translation}</p>
+                  <span>{card.granularity}</span>
+                </article>
+              ))}
+            </div>
+          </section>
+        </>
+      )}
+
+      {view === 'practice' && (
+        <section className="practice-shell">
+          <div className="practice-header">
+            <h2>Flashcard Practice Mode</h2>
+            <label>
+              Practice set
+              <select value={practiceFilter} onChange={(e) => { setPracticeFilter(e.target.value); setPracticeIndex(0) }}>
+                <option value="all">Practice all words</option>
+                <option value="unknown">Practice unknown words</option>
+              </select>
+            </label>
           </div>
-          <article className="story-grid">
-            {story.segments.map((segment, index) => (
-              <span key={`${segment.hanzi}-${index}`} className={`segment ${isSegmentHighlighted(index) ? 'active' : ''}`}>
-                <span className="pinyin">{segment.pinyin || ' '}</span>
-                <span className="hanzi" onClick={(event) => handleSegmentClick(segment, index, event)}>{segment.hanzi}</span>
-              </span>
-            ))}
-          </article>
+
+          {activePracticeCard ? (
+            <article className="practice-card">
+              <p className="practice-count">Card {practiceIndex + 1} of {practiceDeck.length}</p>
+              <h3>{activePracticeCard.source_text}</h3>
+              <small>{activePracticeCard.pinyin || 'No pinyin available'}</small>
+              {showAnswer ? <p className="practice-answer">{activePracticeCard.translation}</p> : <p className="practice-answer-hidden">Flip to see translation</p>}
+
+              <div className="practice-actions">
+                <button onClick={() => setShowAnswer((v) => !v)}>{showAnswer ? 'Hide Answer' : 'Flip Card'}</button>
+                <button onClick={previousPracticeCard}>Previous</button>
+                <button onClick={nextPracticeCard}>Next</button>
+              </div>
+
+              <div className="practice-actions secondary">
+                <button onClick={() => markCardLearned(activePracticeCard.id, false)}>Mark Not Learned</button>
+                <button onClick={() => markCardLearned(activePracticeCard.id, true)}>Mark Learned</button>
+              </div>
+            </article>
+          ) : (
+            <article className="practice-empty">
+              <h3>No cards available for this practice set.</h3>
+              <p>Try saving flashcards in the reader, or switch to “Practice all words”.</p>
+            </article>
+          )}
         </section>
       )}
 
-      {bubble && (
-        <aside className="bubble" style={{ left: bubble.x, top: bubble.y }}>
-          <strong>{bubble.text}</strong>
-          <small>{bubble.pinyin}</small>
-          <p>{bubble.translation}</p>
-          <span className="badge">{bubble.granularity}</span>
-          <div className="bubble-actions">
-            <button onClick={() => speakText(bubble.text)}>Read aloud</button>
-            <button onClick={addFlashcard}>Save flashcard</button>
-          </div>
-        </aside>
-      )}
-
-      <section className="flashcards">
-        <h3>Saved flashcards</h3>
-        <div className="card-grid">
-          {flashcards.map((card) => (
-            <article key={card.id} className="card">
-              <h4>{card.source_text}</h4>
-              <small>{card.pinyin}</small>
-              <p>{card.translation}</p>
-              <span>{card.granularity}</span>
-            </article>
-          ))}
-        </div>
-      </section>
       {error && <p className="error">{error}</p>}
     </main>
   )

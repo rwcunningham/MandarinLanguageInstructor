@@ -36,6 +36,18 @@ header {
   align-items: center;
 }
 
+.top-nav {
+  display: flex;
+  gap: 0.75rem;
+  margin: 1rem 0 1.25rem;
+  flex-wrap: wrap;
+}
+
+.top-nav button.active {
+  background: #4a7dff;
+  color: #fff;
+}
+
 .control-row {
   display: flex;
   gap: 1rem;
@@ -99,16 +111,18 @@ header {
   border-radius: 0.9rem;
   padding: 0.8rem;
   box-shadow: 0 12px 30px rgba(40, 70, 150, 0.2);
+  transform: translateX(-50%);
 }
 
 .bubble::after {
   content: '';
   position: absolute;
-  left: 18px;
-  bottom: -10px;
-  border-width: 10px 10px 0 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  top: -12px;
+  border-width: 0 10px 12px 10px;
   border-style: solid;
-  border-color: #86a8ff transparent transparent transparent;
+  border-color: transparent transparent #86a8ff transparent;
 }
 
 .badge {
@@ -121,4 +135,56 @@ header {
 .flashcards { margin-top: 2rem; }
 .card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.8rem; }
 .card { background: #fff; border-radius: 0.8rem; padding: 0.8rem; }
+
+.practice-shell {
+  background: #fff;
+  border-radius: 1rem;
+  padding: 1rem;
+  box-shadow: 0 8px 30px rgba(20, 50, 110, 0.08);
+}
+
+.practice-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.practice-card, .practice-empty {
+  margin-top: 1rem;
+  border: 1px solid #d8e5ff;
+  border-radius: 0.8rem;
+  padding: 1rem;
+  background: #f9fbff;
+}
+
+.practice-count {
+  margin: 0 0 0.5rem;
+  color: #466;
+  font-size: 0.9rem;
+}
+
+.practice-answer {
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.practice-answer-hidden {
+  color: #668;
+  font-style: italic;
+}
+
+.practice-actions {
+  display: flex;
+  gap: 0.6rem;
+  margin-top: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.practice-actions.secondary button:last-child {
+  background: #4a7dff;
+  color: #fff;
+}
+
 .error { color: #d12c3f; font-weight: 600; }
