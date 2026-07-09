@@ -1,4 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
+import chineseKnotsUrl from './assets/page-art/chinese-knots.png'
+import firecrackersUrl from './assets/page-art/firecrackers.png'
+import goldIngotsUrl from './assets/page-art/gold-ingots.png'
+import lanternsUrl from './assets/page-art/lanterns.png'
+import mandarinBranchUrl from './assets/page-art/mandarin-branch.png'
 
 const api = async (path, method = 'GET', token, body) => {
   const response = await fetch(path, {
@@ -132,6 +137,14 @@ const getDirectionalCardContent = (card, direction) => {
     backAudioLang: isEnglishPrompt ? 'zh-CN' : 'en-US',
     backAudioLabel: isEnglishPrompt ? 'Play Mandarin' : 'Play English',
   }
+}
+
+const PAGE_MARGIN_ART = {
+  auth: { src: lanternsUrl, className: 'margin-art-auth' },
+  reader: { src: mandarinBranchUrl, className: 'margin-art-reader' },
+  practice: { src: chineseKnotsUrl, className: 'margin-art-practice' },
+  quizzes: { src: firecrackersUrl, className: 'margin-art-quizzes' },
+  profile: { src: goldIngotsUrl, className: 'margin-art-profile' }
 }
 
 export default function App() {
@@ -1015,9 +1028,17 @@ export default function App() {
     clearSession()
   }
 
+  const activeMarginArt = PAGE_MARGIN_ART[view] || PAGE_MARGIN_ART.reader
+
   if (!token) {
     return (
       <main className="auth-shell">
+        <img
+          className={`page-margin-art ${PAGE_MARGIN_ART.auth.className}`}
+          src={PAGE_MARGIN_ART.auth.src}
+          alt=""
+          aria-hidden="true"
+        />
         <section className="auth-card">
           <h1>Mandarin Story Coach</h1>
           <p>Read Chinese stories with pinyin, smart lookups, and speech support.</p>
@@ -1048,6 +1069,12 @@ export default function App() {
 
   return (
     <main className="app-shell">
+      <img
+        className={`page-margin-art ${activeMarginArt.className}`}
+        src={activeMarginArt.src}
+        alt=""
+        aria-hidden="true"
+      />
       <header>
         <h1>Welcome, {username}</h1>
         <button className="btn-danger" onClick={logout}>Logout</button>

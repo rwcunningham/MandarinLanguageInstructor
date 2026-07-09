@@ -201,13 +201,59 @@ input:focus-visible,
 .app-shell {
   position: relative;
   z-index: 1;
+  isolation: isolate;
   min-height: 100vh;
   padding: clamp(1rem, 3vw, 2.4rem);
 }
 
 .app-shell {
-  width: min(1180px, 100%);
+  width: min(1040px, 100%);
   margin: 0 auto;
+}
+
+.auth-shell > :not(.page-margin-art),
+.app-shell > :not(.page-margin-art) {
+  position: relative;
+  z-index: 1;
+}
+
+.page-margin-art {
+  position: fixed;
+  z-index: 0;
+  pointer-events: none;
+  width: clamp(5.75rem, 7.6vw, 9rem);
+  max-height: min(42vh, 23rem);
+  object-fit: contain;
+  opacity: 0.28;
+  filter: saturate(0.96) contrast(0.96);
+  mix-blend-mode: multiply;
+}
+
+.margin-art-auth {
+  left: clamp(0.8rem, 2vw, 2rem);
+  top: clamp(5.5rem, 13vh, 8rem);
+  width: clamp(8rem, 14vw, 14rem);
+}
+
+.margin-art-reader {
+  right: clamp(0.25rem, 0.6vw, 0.7rem);
+  top: clamp(7rem, 16vh, 10rem);
+}
+
+.margin-art-practice {
+  left: clamp(0.25rem, 0.6vw, 0.7rem);
+  top: clamp(8rem, 18vh, 12rem);
+}
+
+.margin-art-quizzes {
+  right: clamp(0.25rem, 0.6vw, 0.7rem);
+  bottom: clamp(3.5rem, 8vh, 5rem);
+}
+
+.margin-art-profile {
+  left: clamp(0.25rem, 0.6vw, 0.7rem);
+  bottom: clamp(3.5rem, 8vh, 5rem);
+  width: clamp(6rem, 7vw, 8.5rem);
 }
 
 .auth-card,
@@ -2003,6 +2049,12 @@ header {
   to {
     opacity: 1;
     transform: translateX(-50%) translateY(0);
+  }
+}
+
+@media (max-width: 1240px) {
+  .page-margin-art {
+    display: none;
   }
 }
 
