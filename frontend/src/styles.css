@@ -211,8 +211,8 @@ input:focus-visible,
   margin: 0 auto;
 }
 
-.auth-shell > :not(.page-margin-art),
-.app-shell > :not(.page-margin-art) {
+.auth-shell > :not(.page-margin-art):not(.bubble),
+.app-shell > :not(.page-margin-art):not(.bubble) {
   position: relative;
   z-index: 1;
 }
@@ -453,6 +453,11 @@ header {
   gap: 0.35rem;
   color: var(--ink-soft);
   font-weight: 800;
+}
+
+.leitner-home-button {
+  align-self: end;
+  min-height: 2.75rem;
 }
 
 .direction-toggle {
@@ -756,6 +761,20 @@ header {
   display: grid;
   gap: 0.25rem;
   min-width: 0;
+}
+
+button.story-vocab-saved,
+button.story-vocab-saved:hover:not(:disabled),
+button.story-vocab-saved:focus-visible,
+button.story-vocab-saved:disabled {
+  cursor: default;
+  color: #6d665f;
+  border-color: rgba(84, 61, 37, 0.12);
+  background: linear-gradient(#f4f1eb, #ded8ce);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    0 1px 0 rgba(84, 61, 37, 0.1);
+  opacity: 1;
 }
 
 .completion-row {
@@ -1084,21 +1103,10 @@ header {
 
 .flashcard-stage {
   display: grid;
-  grid-template-columns: 3.25rem minmax(0, 1fr) 3.25rem;
+  grid-template-columns: minmax(0, 1fr);
   align-items: center;
   gap: clamp(0.45rem, 1.5vw, 0.8rem);
   min-width: 0;
-}
-
-.practice-arrow {
-  display: grid;
-  place-items: center;
-  width: 3.25rem;
-  min-width: 3.25rem;
-  height: 4.25rem;
-  padding: 0;
-  font-size: 2.4rem;
-  line-height: 1;
 }
 
 .practice-flashcard {
@@ -2131,7 +2139,7 @@ header {
   .flashcard-stage {
     grid-column: 1 / -1;
     grid-row: 2;
-    grid-template-columns: 2.85rem minmax(0, 1fr) 2.85rem;
+    grid-template-columns: minmax(0, 1fr);
     gap: 0.38rem;
   }
 
@@ -2143,13 +2151,6 @@ header {
     grid-column: 1 / -1;
     grid-row: 2;
     min-height: 11rem;
-  }
-
-  .practice-arrow {
-    width: 2.85rem;
-    min-width: 2.85rem;
-    height: 3.6rem;
-    font-size: 2rem;
   }
 
   .practice-flashcard,

@@ -163,7 +163,7 @@ export default function App() {
   const [profile, setProfile] = useState(null)
   const [summary, setSummary] = useState(null)
   const [view, setView] = useState('reader')
-  const [practiceFilter, setPracticeFilter] = useState('due')
+  const [practiceFilter, setPracticeFilter] = useState('all')
   const [practiceDirection, setPracticeDirection] = useState('zh-en')
   const [practiceIndex, setPracticeIndex] = useState(0)
   const [sessionDeck, setSessionDeck] = useState([])
@@ -196,6 +196,20 @@ export default function App() {
   const [showQuizPinyin, setShowQuizPinyin] = useState(false)
   const [error, setError] = useState('')
 
+  const clearPracticeState = (deck = []) => {
+    setSessionDeck(deck)
+    setPracticeIndex(0)
+    setCorrectCards([])
+    setIncorrectCards([])
+    setReviewedRatings({})
+    setActiveReviewList(null)
+    setToastMessage('')
+    setFlyDirection(null)
+    setShowAnswer(false)
+    setSessionComplete(false)
+    setSessionSaved(false)
+  }
+
   const clearSession = () => {
     setToken('')
     localStorage.removeItem('token')
@@ -209,6 +223,8 @@ export default function App() {
     setSummary(null)
     setBubble(null)
     setSelectedRange(null)
+    clearPracticeState()
+    setLeitnerSessionStarted(false)
     setQuizDashboard(null)
     setActiveQuiz(null)
     setQuizIndex(0)
@@ -264,6 +280,15 @@ export default function App() {
       return words
     }, [])
   }, [story])
+
+  const savedStoryWordKeys = useMemo(() => {
+    if (!story?.id) return new Set()
+    return new Set(
+      flashcards
+        .filter((card) => card.story_id === story.id)
+        .map((card) => card.source_text)
+    )
+  }, [flashcards, story?.id])
 
   const todayKey = toDateKey()
   const isLeitnerMode = practiceFilter === 'leitner'
@@ -364,17 +389,7 @@ export default function App() {
   ), [quizResult])
 
   const resetPracticeSession = (deck = availablePracticeDeck) => {
-    setSessionDeck(deck)
-    setPracticeIndex(0)
-    setCorrectCards([])
-    setIncorrectCards([])
-    setReviewedRatings({})
-    setActiveReviewList(null)
-    setToastMessage('')
-    setFlyDirection(null)
-    setShowAnswer(false)
-    setSessionComplete(false)
-    setSessionSaved(false)
+    clearPracticeState(deck)
   }
 
   useEffect(() => {
@@ -399,6 +414,18 @@ export default function App() {
       setSessionDeck(availablePracticeDeck)
     }
   }, [availablePracticeDeck.length, answeredCount, isLeitnerMode, sessionComplete, sessionDeck.length])
+
+  useEffect(() => {
+    if (sessionDeck.length === 0) return
+    const validCardIds = new Set(flashcards.map((card) => card.id))
+    const hasStaleCard = sessionDeck.some((card) => !card?.id || !validCardIds.has(card.id))
+    if (!hasStaleCard) return
+
+    if (isLeitnerMode) {
+      setLeitnerSessionStarted(false)
+    }
+    resetPracticeSession(isLeitnerMode ? [] : availablePracticeDeck)
+  }, [availablePracticeDeck, flashcards, isLeitnerMode, sessionDeck])
 
   useEffect(() => {
     if (isLeitnerMode && !leitnerSessionStarted) {
@@ -453,6 +480,9 @@ export default function App() {
       const minX = window.scrollX + 40
       const maxX = window.scrollX + window.innerWidth - 40
       const clampedX = Math.min(maxX, Math.max(minX, anchorX))
+      const shellRect = document.querySelector('.app-shell')?.getBoundingClientRect()
+      const shellPageX = shellRect ? window.scrollX + shellRect.left : 0
+      const shellPageY = shellRect ? window.scrollY + shellRect.top : 0
 
       setBubble({
         ...data,
@@ -460,8 +490,8 @@ export default function App() {
         context_sentence_pinyin: activeSentence?.pinyin || '',
         context_sentence_literal_english: activeSentence?.literal_english || '',
         context_sentence_english: activeSentence?.natural_english || activeSentence?.english || '',
-        x: clampedX,
-        y: window.scrollY + (rect?.bottom || 220) + 14
+        x: clampedX - shellPageX,
+        y: window.scrollY + (rect?.bottom || 220) + 14 - shellPageY
       })
       setSelectedRange(range)
       const summaryData = await api('/api/progress/summary', 'GET', token)
@@ -582,6 +612,17 @@ export default function App() {
     try {
       const path = mode === 'login' ? '/api/auth/login' : '/api/auth/register'
       const data = await api(path, 'POST', null, credentials)
+      setLevels([])
+      setStories([])
+      setSelectedStoryId(null)
+      setStory(null)
+      setBubble(null)
+      setSelectedRange(null)
+      setFlashcards([])
+      setProfile(null)
+      setSummary(null)
+      clearPracticeState()
+      setLeitnerSessionStarted(false)
       setToken(data.token)
       setUsername(data.username)
       localStorage.setItem('token', data.token)
@@ -713,8 +754,21 @@ export default function App() {
       })
       await refreshLearningData()
       if (shouldAdvance) nextPracticeCard()
+      return true
     } catch (err) {
+      if (err.status === 404) {
+        setSessionDeck((deck) => deck.filter((card) => card.id !== cardId))
+        try {
+          await refreshLearningData()
+        } catch (refreshErr) {
+          handleRequestError(refreshErr)
+          return false
+        }
+        setError('That flashcard is no longer available. I refreshed your practice deck.')
+        return false
+      }
       setError(err.message)
+      return false
     }
   }
 
@@ -766,9 +820,16 @@ export default function App() {
     setFlyDirection(direction)
 
     window.setTimeout(async () => {
-      await reviewCard(card.id, rating, false, reviewDirection)
+      const reviewSaved = await reviewCard(card.id, rating, false, reviewDirection)
       setFlyDirection(null)
       setShowAnswer(false)
+      if (!reviewSaved) {
+        setCorrectCards(correctCards)
+        setIncorrectCards(incorrectCards)
+        setReviewedRatings(reviewedRatings)
+        setToastMessage('')
+        return
+      }
       if (nextIndex === -1) {
         setSessionComplete(true)
         await recordPracticeSession(nextCorrectCards, nextIncorrectCards, nextReviewedRatings)
@@ -927,17 +988,6 @@ export default function App() {
     setShowAnswer(false)
   }
 
-  const previousPracticeCard = () => {
-    if (practiceDeck.length <= 1) return
-    setPracticeIndex((i) => {
-      for (let index = i - 1; index >= 0; index -= 1) {
-        if (!reviewedRatings[practiceDeck[index]?.id]) return index
-      }
-      return i
-    })
-    setShowAnswer(false)
-  }
-
   const handleFlipPracticeCard = () => {
     if (flyDirection) return
     setShowAnswer((value) => !value)
@@ -989,6 +1039,10 @@ export default function App() {
     setLeitnerSessionStarted(true)
     resetPracticeSession(deck)
   }
+  const returnToLeitnerHome = () => {
+    setLeitnerSessionStarted(false)
+    resetPracticeSession([])
+  }
   const startIncorrectReview = () => {
     resetPracticeSession(incorrectCards)
   }
@@ -1006,14 +1060,6 @@ export default function App() {
       if (tagName === 'input' || tagName === 'select' || tagName === 'textarea' || target?.isContentEditable) return
       if (!activePracticeCard || flyDirection) return
 
-      if (event.key === 'ArrowLeft') {
-        event.preventDefault()
-        previousPracticeCard()
-      }
-      if (event.key === 'ArrowRight') {
-        event.preventDefault()
-        nextPracticeCard()
-      }
       if (event.key === ' ' || event.key === 'Enter') {
         event.preventDefault()
         handleFlipPracticeCard()
@@ -1230,16 +1276,25 @@ export default function App() {
                   </div>
                   <div className="story-vocab-list">
                     {(showAllStoryWords ? storyVocabulary : storyVocabulary.slice(0, 1)).map((word) => (
-                      <article key={word.text} className="story-vocab-item">
-                        <div>
-                          <h4>{word.text}</h4>
-                          <small>{word.pinyin}</small>
-                          <p>{word.translation}</p>
-                        </div>
-                        <button className="btn-quiet" onClick={() => saveVocabularyFlashcard(word)} disabled={savingWordKey === word.text || savingAllWords}>
-                          {savingWordKey === word.text ? 'Saving...' : 'Save flashcard'}
-                        </button>
-                      </article>
+                      (() => {
+                        const isSaved = savedStoryWordKeys.has(word.text)
+                        return (
+                          <article key={word.text} className="story-vocab-item">
+                            <div>
+                              <h4>{word.text}</h4>
+                              <small>{word.pinyin}</small>
+                              <p>{word.translation}</p>
+                            </div>
+                            <button
+                              className={`btn-quiet ${isSaved ? 'story-vocab-saved' : ''}`}
+                              onClick={() => saveVocabularyFlashcard(word)}
+                              disabled={isSaved || savingWordKey === word.text || savingAllWords}
+                            >
+                              {isSaved ? 'Saved flashcard' : savingWordKey === word.text ? 'Saving...' : 'Save flashcard'}
+                            </button>
+                          </article>
+                        )
+                      })()
                     ))}
                   </div>
                 </section>
@@ -1612,9 +1667,8 @@ export default function App() {
               <label>
                 Practice set
                 <select value={practiceFilter} onChange={(e) => { setPracticeFilter(e.target.value); setPracticeIndex(0) }}>
-                  <option value="due">Due now</option>
-                  <option value="all">Practice all words</option>
-                  <option value="unknown">Practice unknown words</option>
+                  <option value="all">All words</option>
+                  <option value="unknown">Unknown words</option>
                   <option value="known">Known words</option>
                   <option value="leitner">Leitner Mode</option>
                   <option value="rating:again">Difficulty: Again</option>
@@ -1645,6 +1699,11 @@ export default function App() {
                 </div>
                 {isLeitnerMode && <small>Automatic: Mandarin → English first, then English → Mandarin.</small>}
               </div>
+              {isLeitnerMode && (leitnerSessionStarted || sessionComplete) && (
+                <button className="btn-quiet leitner-home-button" type="button" onClick={returnToLeitnerHome}>
+                  Back to Leitner Home
+                </button>
+              )}
             </div>
           </div>
 
@@ -1789,16 +1848,6 @@ export default function App() {
                 </button>
 
                 <div className="flashcard-stage">
-                  <button
-                    className="practice-arrow left btn-quiet"
-                    type="button"
-                    aria-label="Previous card"
-                    onClick={previousPracticeCard}
-                    disabled={flyDirection}
-                  >
-                    ‹
-                  </button>
-
                   <article
                     className={`practice-flashcard ${showAnswer ? 'is-flipped' : ''} ${flyDirection ? `fly-${flyDirection}` : ''}`}
                     onClick={handleFlipPracticeCard}
@@ -1855,16 +1904,6 @@ export default function App() {
                       </div>
                     </div>
                   </article>
-
-                  <button
-                    className="practice-arrow right btn-quiet"
-                    type="button"
-                    aria-label="Next card"
-                    onClick={nextPracticeCard}
-                    disabled={flyDirection}
-                  >
-                    ›
-                  </button>
                 </div>
 
                 <button

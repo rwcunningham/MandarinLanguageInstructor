@@ -12,6 +12,7 @@ from flask_sqlalchemy import SQLAlchemy
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
+from werkzeug.exceptions import HTTPException
 from werkzeug.security import check_password_hash, generate_password_hash
 
 app = Flask(__name__)
@@ -37,6 +38,13 @@ LEITNER_INTERVAL_DAYS = {
     5: 14,
 }
 DIRECTION_MASTERY_THRESHOLD = 3
+
+
+@app.errorhandler(HTTPException)
+def handle_api_http_exception(error: HTTPException):
+    if request.path.startswith("/api/"):
+        return jsonify({"error": error.description or error.name}), error.code or 500
+    return error
 
 
 class User(db.Model):
@@ -1019,7 +1027,9 @@ def add_flashcard():
 @app.delete("/api/flashcards/<int:card_id>")
 @auth_required
 def delete_flashcard(card_id: int):
-    card = Flashcard.query.filter_by(id=card_id, user_id=request.user_id).first_or_404()
+    card = Flashcard.query.filter_by(id=card_id, user_id=request.user_id).first()
+    if not card:
+        return jsonify({"error": "Flashcard not found"}), 404
     db.session.delete(card)
     db.session.commit()
     return jsonify({"message": "Flashcard deleted"})
@@ -1028,7 +1038,9 @@ def delete_flashcard(card_id: int):
 @app.post("/api/flashcards/<int:card_id>/review")
 @auth_required
 def review_flashcard(card_id: int):
-    card = Flashcard.query.filter_by(id=card_id, user_id=request.user_id).first_or_404()
+    card = Flashcard.query.filter_by(id=card_id, user_id=request.user_id).first()
+    if not card:
+        return jsonify({"error": "Flashcard not found. Refresh your deck and try again."}), 404
     payload = request.get_json(silent=True) or {}
     rating = payload.get("rating")
     if rating not in {"again", "hard", "good", "easy"}:
